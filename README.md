@@ -137,6 +137,11 @@ python main.py pano_dataset=mp3d pp_dataset=lsun mode=test ckpt_dir=ckpt/best_mp
 
 # --ckpt_dir: the path to the checkpoint file.
 ```
+## 📚 Pretrained Model
+The pretrained model can be downloaded from [this link](https://drive.google.com/drive/u/1/folders/1sBRLlsPgh8s3J1c7YxTr2-Efme5l9oKb). Please put the checkpoint file in `ckpt` directory.
+- best_mp3d.pth: the model trained on Matterport3D and LSUN dataset.
+- best_pano_plus_whole_st2d3d.pth: the model trained on PanoContext (training split), Stanford 2D-3D (whole) and LSUN dataset.
+- best_st2d3d_plus_whole_pano.pth: the model trained on PanoContext (whole) and Stanford 2D-3D (training split) and LSUN dataset.
 ## 📊 Visualization
 To visualize the results, you can use the following command:
 ```bash

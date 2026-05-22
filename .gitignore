@@ -167,3 +167,4 @@ cython_debug/
 /datasets/matterport3d_dataset.py
 /datasets/SharedFunctions.py
 /src/pp/
+/.vscode/
