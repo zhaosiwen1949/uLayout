@@ -9,6 +9,9 @@ pano:
 
 st2d3d:
   data_dir: src/pano/pano_st2d3d
+  
+custom:
+  data_dir: src/custom
 
 # pp dataset
 lsun: 

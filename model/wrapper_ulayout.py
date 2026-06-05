@@ -19,6 +19,7 @@ from loguru import logger
 from datasets.mp3d_hn_ori_dataset import PanoCorBonDataset
 from datasets.pano_st2d3d_dataset import PanoSt2D3DDataset
 from datasets.lsun_preproc_dataset import LSUNPreprocDataset
+from datasets.custom_pano_dataset import CustomPanoDataset
 from utils.pp_utils import read_image
 from utils.io_utils import save_json_dict, print_cfg_information, create_directory, save_cfg, plotXY, prepare_corner_wo_occlusion
 from utils.eval_utils_research import   eval_2d3d_iuo_from_tensors, compute_L1_loss, compute_L1_loss_range, \
@@ -276,11 +277,11 @@ class WrapperuLayout:
         self.tb_writer.add_scalar(
             "valid_IoU/Pano_3DIoU", total_eval["3DIoU_pano"] / pano_ceilling_num, self.current_epoch)
         self.tb_writer.add_scalar(
-            "valid_IoU/PP_2DIoU_floor", total_eval["2DIoU_pp_floor"] / pp_floor_num, self.current_epoch)
+            "valid_IoU/PP_2DIoU_floor", total_eval["2DIoU_pp_floor"] / pp_floor_num if pp_floor_num != 0 else 0, self.current_epoch)
         self.tb_writer.add_scalar(
-            "valid_IoU/PP_2DIoU_ceiling", total_eval["2DIoU_pp_ceiling"] / pp_ceilling_num, self.current_epoch)
+            "valid_IoU/PP_2DIoU_ceiling", total_eval["2DIoU_pp_ceiling"] / pp_ceilling_num if pp_ceilling_num != 0 else 0,  self.current_epoch)
         self.tb_writer.add_scalar(
-            "valid_IoU/PP_2DIoU_avg", (total_eval["2DIoU_pp_floor"] + total_eval["2DIoU_pp_ceiling"]) / (pp_floor_num + pp_ceilling_num), self.current_epoch)
+            "valid_IoU/PP_2DIoU_avg", (total_eval["2DIoU_pp_floor"] + total_eval["2DIoU_pp_ceiling"]) / (pp_floor_num + pp_ceilling_num) if (pp_floor_num + pp_ceilling_num) != 0 else 0, self.current_epoch)
         self.tb_writer.add_scalar(
             "valid_IoU/Total_IoU", (total_eval["3DIoU_pano"] + total_eval["2DIoU_pp_floor"] + total_eval["2DIoU_pp_ceiling"]) / (pano_ceilling_num + pp_floor_num + pp_ceilling_num), self.current_epoch)
 
@@ -599,6 +600,22 @@ class WrapperuLayout:
             worker_init_fn=lambda x: np.random.seed(self.cfg.model.seed)
         )
 
+    def set_valid_dataloader_custom(self, custom_pano_dir, mode='test'):
+        logger.info(f"Setting IoU {mode} Dataloader")
+        custom_pano_dataset = CustomPanoDataset(custom_pano_dir, mode)
+        logger.info(f'pano_st2d3d_dataset_{mode}: {len(custom_pano_dataset)}')
+
+        self.valid_iou_loader = DataLoader(
+            custom_pano_dataset,
+            batch_size=self.cfg.model.batch_size,
+            shuffle=False,
+            drop_last=False,
+            # num_workers=self.cfg.model.num_workers,
+            num_workers=0,
+            pin_memory=True if self.device != 'cpu' else False,
+            worker_init_fn=lambda x: np.random.seed(self.cfg.model.seed)
+        )
+
     def plot_pano(self, save_pred_boundary=False):
         self.net.eval()
         iterator_valid_iou = iter(self.valid_iou_loader)
@@ -629,10 +646,10 @@ class WrapperuLayout:
                     v_x = np.linspace(0, img.shape[1] - 1, img.shape[1]).astype(int)
 
                     # plot gt boundary
-                    gt_pixel_ceiling = np.vstack((v_x, gt_pixel[0])).transpose()
-                    plotXY(img, gt_pixel_ceiling, color=(255,0,0))
-                    gt_pixel_floor = np.vstack((v_x, gt_pixel[1])).transpose()
-                    plotXY(img, gt_pixel_floor, color=(255,0,0))
+                    # gt_pixel_ceiling = np.vstack((v_x, gt_pixel[0])).transpose()
+                    # plotXY(img, gt_pixel_ceiling, color=(255,0,0))
+                    # gt_pixel_floor = np.vstack((v_x, gt_pixel[1])).transpose()
+                    # plotXY(img, gt_pixel_floor, color=(255,0,0))
 
                     est_pixel_ceiling = np.vstack((v_x, est_pixel[0])).transpose()
                     plotXY(img, est_pixel_ceiling, color=(0,255,255))

@@ -13,6 +13,7 @@ from layout_3d_utils import np_coor2xy, np_coorx2u, np_coory2v, layout_2_depth
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from datasets.mp3d_hn_ori_dataset import PanoCorBonDataset
 from datasets.pano_st2d3d_dataset import PanoSt2D3DDataset
+from datasets.custom_pano_dataset import CustomPanoDataset
 
 
 if __name__ == '__main__':
@@ -26,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', 
                         required=True,
                         default='pano',
-                        choices=['mp3d', 'pano', 'st2d3d'],
+                        choices=['mp3d', 'pano', 'st2d3d', 'custom'],
                         help='mp3d or pano or st2d3d')
     parser.add_argument('--mode',
                         default='test',
@@ -63,6 +64,8 @@ if __name__ == '__main__':
         dataset = PanoSt2D3DDataset(args.dataset_dir, mode=args.mode, subset='pano')
     elif args.dataset == 'st2d3d':
         dataset = PanoSt2D3DDataset(args.dataset_dir, mode=args.mode, subset='st2d3d')
+    elif args.dataset == 'custom':
+        dataset = CustomPanoDataset(args.dataset_dir, mode=args.mode)
     else:
         raise ValueError(f'Unknown dataset {args.dataset}')
 
