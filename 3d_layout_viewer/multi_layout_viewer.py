@@ -131,7 +131,7 @@ if __name__ == '__main__':
                         help='rig_reconstruction.jpeg rig rotation Ror = Rx(AX) @ Ry(AY) '
                              '(degrees) mapping pano_camera0 -> panorama frame')
     parser.add_argument('--plan2d', action='store_true',
-                        help='Show a top-down 2D floor plan (project world onto the X-Z plane)')
+                        help='Show a top-down 2D floor plan (project onto the scene floor plane)')
     parser.add_argument('--out',
                         help='Export combined mesh as PLY (or image, e.g. plan.png, with --plan2d)')
     parser.add_argument('--vis', action='store_true')
@@ -194,13 +194,14 @@ if __name__ == '__main__':
                   % (index, img_name, c[0], c[1], c[2]))
 
         if args.plan2d:
-            # Top-down 2D plan: transform the local floor outline into world
-            # with the full 4x4, then project onto the X-Z plane (world up = Y).
+            # Transform the local floor outline into world. The scene is globally
+            # rotated (its floor is not the world X-Z plane), so keep the 3D world
+            # points and the room's up direction here; the actual floor-plane
+            # projection happens after the loop once the common up is known.
             local = floor_outline_3d(est_layout)              # [W, 3]
             world = local @ T[:3, :3].T + T[:3, 3]            # [W, 3]
-            outline = world[:, [0, 2]]                        # project to (X, Z)
-            cam_xy = T[:3, 3][[0, 2]]
-            rooms_2d.append((index, img_name, outline, cam_xy))
+            up = T[:3, :3] @ np.array([0.0, 0.0, 1.0])        # room up (+Z) in world
+            rooms_2d.append((index, img_name, world, T[:3, 3].copy(), up))
             continue
 
         equirect_texture = dataset[index]['img'].numpy().transpose(1, 2, 0) * 255
@@ -216,6 +217,23 @@ if __name__ == '__main__':
                 meshes.append(g)
 
     if args.plan2d:
+        # The scene has an overall rotation, so its floor is not the world X-Z
+        # plane. Project onto the actual floor plane: take the common up
+        # direction (average of the rooms' up vectors) and an orthonormal
+        # in-plane basis (e1, e2) perpendicular to it. (u . e1 = u . e2 = 0, so
+        # dropping the up component gives a true top-down floor plan.)
+        up = np.mean([u for _, _, _, _, u in rooms_2d], axis=0)
+        up = up / np.linalg.norm(up)
+        seed = np.array([1.0, 0.0, 0.0])
+        if abs(seed @ up) > 0.9:
+            seed = np.array([0.0, 1.0, 0.0])
+        e1 = seed - (seed @ up) * up
+        e1 = e1 / np.linalg.norm(e1)
+        e2 = np.cross(up, e1)
+        basis = np.column_stack([e1, e2])                     # [3, 2]
+        rooms_2d = [(index, img_name, world @ basis, cam @ basis)
+                    for index, img_name, world, cam, _ in rooms_2d]
+
         # tab10-like palette
         palette = [
             [0.12, 0.47, 0.71], [1.00, 0.50, 0.05], [0.17, 0.63, 0.17],
@@ -271,9 +289,9 @@ if __name__ == '__main__':
                             xytext=(5, 5), color=color)
             ax.set_aspect('equal')
             ax.grid(True, ls='--', alpha=0.5)
-            ax.set_xlabel('world X (m)')
-            ax.set_ylabel('world Z (m)')
-            ax.set_title('Top-down floor plan (X-Z projection, scale=%g)' % args.scale)
+            ax.set_xlabel('floor e1 (m)')
+            ax.set_ylabel('floor e2 (m)')
+            ax.set_title('Top-down floor plan (floor-plane projection, scale=%g)' % args.scale)
             ax.legend(loc='best', fontsize=8)
             fig.savefig(args.out, dpi=200, bbox_inches='tight')
             print('Saved 2D floor plan to %s' % args.out)
