@@ -58,15 +58,16 @@ class Resnet(nn.Module):
 
     def forward(self, x):
         features = []
+        # [5, 3, 512, 1024]
         x = self.encoder.conv1(x)
         x = self.encoder.bn1(x)
         x = self.encoder.relu(x)
-        x = self.encoder.maxpool(x)
+        x = self.encoder.maxpool(x) # [5, 64, 128, 256]
 
-        x = self.encoder.layer1(x);  features.append(x)  # 1/4
-        x = self.encoder.layer2(x);  features.append(x)  # 1/8
-        x = self.encoder.layer3(x);  features.append(x)  # 1/16
-        x = self.encoder.layer4(x);  features.append(x)  # 1/32
+        x = self.encoder.layer1(x);  features.append(x)  # 1/4 [5, 256, 128, 256]
+        x = self.encoder.layer2(x);  features.append(x)  # 1/8 [5, 512, 64, 128]
+        x = self.encoder.layer3(x);  features.append(x)  # 1/16 [5, 1024, 32, 64]
+        x = self.encoder.layer4(x);  features.append(x)  # 1/32 [5, 2048, 16, 32]
         return features
 
     def list_blocks(self):
@@ -150,6 +151,7 @@ class GlobalHeightStage(nn.Module):
     def __init__(self, c1, c2, c3, c4, out_scale=8):
         ''' Process 4 blocks from encoder to single multiscale features '''
         super(GlobalHeightStage, self).__init__()
+        # 256, 512, 1024, 2048
         self.cs = c1, c2, c3, c4
         self.out_scale = out_scale
         self.ghc_lst = nn.ModuleList([
@@ -160,8 +162,20 @@ class GlobalHeightStage(nn.Module):
         ])
 
     def forward(self, conv_list, out_w, idx):
+        # conv_list
+        # 0: [5, 256, 128, 256]
+        # 1: [5, 512, 64, 128]
+        # 2: [5, 1024, 32, 64]
+        # 3: [5, 2048, 16, 32]
+        # out_w: 256
         assert len(conv_list) == 4
         bs = conv_list[0].shape[0]
+        # GlobalHeightConv 的作用：
+        # 1. C 卷积后，维度除以 8
+        # 2. H 卷积后，维度除以 16
+        # 3. W 经过插值放大后，维度为 256
+        # 因此每一个 GlobalHeightConv 的输出 reshape 之后的 shape 为 [5, 256, 256]
+        # cat 之后的 feature 为 [5, 1024, 256]
         feature = torch.cat([
             f(x, out_w).reshape(bs, -1, out_w)
             for f, x, out_c in zip(self.ghc_lst, conv_list, self.cs)
@@ -321,6 +335,12 @@ class ReduceWholeFeatureExtractor(nn.Module):
             feature_pers = torch.zeros((0,1024,256)).to(x.device)
         if len(x_pano) > 0:
             x_pano = self._prepare_x(x_pano)
+
+            # conv_list_pano
+            # 0: [5, 256, 128, 256]
+            # 1: [5, 512, 64, 128]
+            # 2: [5, 1024, 32, 64]
+            # 3: [5, 2048, 16, 32]
             conv_list_pano = self.feature_extractor(x_pano)
             feature_pano = self.reduce_height_module(conv_list_pano, x.shape[3]//self.step_cols, idx)
         else:
