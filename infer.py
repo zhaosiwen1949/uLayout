@@ -26,7 +26,7 @@ def main(cfg):
     model = WrapperuLayout(cfg)
 
     model.prepare_for_validation_multi_dataset()
-    model.set_valid_dataloader_custom(cfg.custom.data_dir, mode=cfg.mode)
+    model.set_valid_dataloader_custom(cfg.data_dir, mode=cfg.mode)
     model.plot_pano(cfg.save_pred) # 3D layout only provide for panorama dataset.
 
 

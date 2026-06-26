@@ -7,6 +7,7 @@ defaults:
 pano_dataset: mp3d
 pp_dataset: lsun
 mode : test
+data_dir : src/custom   # 推理数据路径，可在命令行覆盖：python infer.py data_dir=/path/to/data
 output_dir : output
 ckpt_dir : ckpt/best_mp3d.pth
 cuda_device : 0
