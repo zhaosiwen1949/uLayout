@@ -11,10 +11,10 @@
 
 cd 3d_layout_viewer/
 python multi_layout_viewer.py \
-    --dataset_dir ../src/custom \
+    --dataset_dir ../src/xinghecheng \
     --dataset custom \
     --mode test \
-    --layout ../output/ulayout_mp3d_lsun_test/inference_img/panorama_pred_boundary \
+    --layout ../output/xinghecheng_uLayout/inference_img/panorama_pred_boundary \
     --scale 1.0 --vis --ignore_ceiling --ignore_wireframe \
     --rig-angles 35 -40 --plan2d
 

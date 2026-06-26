@@ -3,4 +3,4 @@
 # --ckpt_dir: the path to the checkpoint file.
 
 cd 3d_layout_viewer/
-python layout_viewer.py --dataset_dir ../src/custom --dataset custom --mode test --index 0 --layout ../output/ulayout_mp3d_lsun_test/inference_img/panorama_pred_boundary  --vis --ignore_ceiling --ignore_wireframe
+python layout_viewer.py --dataset_dir ../src/xinghecheng --dataset custom --mode test --index 0 --layout ../output/xinghecheng_uLayout/inference_img/panorama_pred_boundary  --vis --ignore_ceiling --ignore_wireframe

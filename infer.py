@@ -1,5 +1,6 @@
 import argparse
 import hydra
+import os
 import torch
 import numpy as np
 import random
@@ -21,7 +22,8 @@ def fix_seed(seed):
 @hydra.main(config_path="config", config_name="main_config", version_base="1.3")
 def main(cfg):
     
-    cfg.id_exp = "ulayout" + "_" + cfg.pano_dataset + "_" + cfg.pp_dataset + "_" + cfg.mode
+    # Save under output/<data_dir name>_uLayout, e.g. data_dir=src/xinghecheng -> xinghecheng_uLayout
+    cfg.id_exp = os.path.basename(os.path.normpath(cfg.data_dir)) + "_uLayout"
     fix_seed(cfg.model.seed)
     model = WrapperuLayout(cfg)
 
