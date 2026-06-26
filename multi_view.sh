@@ -7,6 +7,11 @@
 # --indices:    optional subset, e.g. --indices 0 1
 # --rig-angles: rig rotation angles AX AY in degrees (default 35 -40)
 # --plan2d:     show a top-down 2D floor plan (project onto the scene floor plane)
+# --plan-style: 2D plan style: vector (per-room polygons, default) or heatmap
+#               (wall-line coverage density; use for thousands of rooms to avoid blackout)
+# --grid-res:   heatmap grid cell size in meters (default 0.05)
+# --line-width: heatmap wall-line thickness (default 1)
+# --norm-pct:   heatmap normalization percentile (default 95; lower = darker walls)
 # --out:        optional export: combined PLY, or an image (e.g. plan.png) with --plan2d
 
 cd 3d_layout_viewer/
@@ -16,5 +21,5 @@ python multi_layout_viewer.py \
     --mode test \
     --layout ../output/xinghecheng_uLayout/inference_img/panorama_pred_boundary \
     --scale 1.0 --vis --ignore_ceiling --ignore_wireframe \
-    --rig-angles 35 -40 --plan2d
+    --rig-angles 35 -40 --plan2d --plan-style heatmap
 

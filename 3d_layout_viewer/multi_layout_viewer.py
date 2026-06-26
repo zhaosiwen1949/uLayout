@@ -97,6 +97,85 @@ def floor_outline_3d(est_layout):
     return np.stack([cs * np.sin(us), -cs * np.cos(us), np.full(W, -1.6)], 1)
 
 
+def render_heatmap_plan(rooms_2d, args):
+    '''Wall-line coverage heatmap for the top-down 2D floor plan.
+
+    Each rooms_2d entry is (index, img_name, outline[W,2], cam_xy[2]) already
+    projected onto the floor plane (meters). Every room's wall-base outline is
+    rasterized as a closed polyline into a shared grid; each cell counts how
+    many rooms' walls pass through it. The count is clipped at the --norm-pct
+    percentile (over covered cells) and normalized to 0..1, then drawn with a
+    white background and black walls (darker = more rooms). Only the wall lines
+    are drawn -- the room interior is not filled. Scales to thousands of rooms
+    without the overdraw blackout of the vector style.
+    '''
+    import cv2
+    import matplotlib.pyplot as plt
+
+    all_xy = np.vstack([outline for _, _, outline, _ in rooms_2d])
+
+    # Robust bounds: floor_outline_3d's cs = 1.6/tan(vf) blows up where the
+    # floor boundary angle vf -> 0, producing far outlier points. Use 1..99
+    # percentile so a few outliers don't blow up the grid or dominate the map.
+    xmin, ymin = np.percentile(all_xy, 1, axis=0)
+    xmax, ymax = np.percentile(all_xy, 99, axis=0)
+    margin = 0.5
+    xmin, ymin, xmax, ymax = xmin - margin, ymin - margin, xmax + margin, ymax + margin
+
+    cell = args.grid_res
+    nx = max(int(min(np.ceil((xmax - xmin) / cell), args.max_grid)), 1)
+    ny = max(int(min(np.ceil((ymax - ymin) / cell), args.max_grid)), 1)
+    sx = nx / (xmax - xmin)   # meters -> pixel scale (== 1/cell unless capped)
+    sy = ny / (ymax - ymin)
+
+    def to_px(xy):
+        return np.stack([(xy[:, 0] - xmin) * sx, (xy[:, 1] - ymin) * sy], -1)
+
+    cov = np.zeros((ny, nx), dtype=np.int32)
+    for _, _, outline, _ in rooms_2d:
+        poly = to_px(outline)                                  # [W, 2] in px
+        col0 = max(int(np.floor(poly[:, 0].min())), 0)
+        col1 = min(int(np.ceil(poly[:, 0].max())), nx)
+        row0 = max(int(np.floor(poly[:, 1].min())), 0)
+        row1 = min(int(np.ceil(poly[:, 1].max())), ny)
+        if col1 <= col0 or row1 <= row0:
+            continue
+        # Rasterize the closed wall outline onto a fresh 0/1 local mask, then
+        # accumulate: a room contributes at most +1 to each cell it touches.
+        mask = np.zeros((row1 - row0, col1 - col0), dtype=np.uint8)
+        poly_local = poly - np.array([col0, row0])
+        cv2.polylines(mask, [poly_local.round().astype(np.int32)],
+                      isClosed=True, color=1, thickness=args.line_width)
+        cov[row0:row1, col0:col1] += mask
+
+    covered = cov[cov > 0]
+    if covered.size == 0:
+        print('[plan2d/heatmap] no wall coverage to render')
+        return
+    denom = np.percentile(covered, args.norm_pct)
+    if denom <= 0:
+        denom = float(cov.max())
+    print('[plan2d/heatmap] grid %dx%d, cov.max=%d, norm denom(%.0f%%)=%.1f'
+          % (nx, ny, int(cov.max()), args.norm_pct, denom))
+
+    norm = np.clip(cov / denom, 0.0, 1.0)
+    gray = 1.0 - norm                                          # white bg, black walls
+
+    fig, ax = plt.subplots(figsize=(12, 12))
+    ax.imshow(gray, origin='lower', extent=[xmin, xmax, ymin, ymax],
+              cmap='gray', vmin=0.0, vmax=1.0, interpolation='nearest')
+    ax.set_aspect('equal')
+    ax.set_xlabel('floor e1 (m)')
+    ax.set_ylabel('floor e2 (m)')
+    ax.set_title('Top-down wall-coverage (normalized, darker=more rooms, cell=%gm)'
+                 % cell)
+    if args.out:
+        fig.savefig(args.out, dpi=200, bbox_inches='tight')
+        print('Saved 2D wall-coverage heatmap to %s' % args.out)
+    elif args.vis:
+        plt.show()
+
+
 if __name__ == '__main__':
 
     import argparse
@@ -132,6 +211,28 @@ if __name__ == '__main__':
                              '(degrees) mapping pano_camera0 -> panorama frame')
     parser.add_argument('--plan2d', action='store_true',
                         help='Show a top-down 2D floor plan (project onto the scene floor plane)')
+    parser.add_argument('--plan-style',
+                        choices=['vector', 'heatmap'],
+                        default='vector',
+                        help='2D plan style: vector (per-room polygons, default) or '
+                             'heatmap (wall-line coverage density, scales to thousands of rooms)')
+    parser.add_argument('--grid-res',
+                        type=float,
+                        default=0.05,
+                        help='heatmap grid cell size in meters')
+    parser.add_argument('--line-width',
+                        type=int,
+                        default=1,
+                        help='heatmap wall-line rasterization width (cv2.polylines thickness)')
+    parser.add_argument('--norm-pct',
+                        type=float,
+                        default=95.0,
+                        help='heatmap normalization percentile: clip coverage at this '
+                             'percentile (over covered cells) before normalizing to 0..1')
+    parser.add_argument('--max-grid',
+                        type=int,
+                        default=4000,
+                        help='heatmap max grid cells per side (caps memory on huge extents)')
     parser.add_argument('--out',
                         help='Export combined mesh as PLY (or image, e.g. plan.png, with --plan2d)')
     parser.add_argument('--vis', action='store_true')
@@ -233,6 +334,10 @@ if __name__ == '__main__':
         basis = np.column_stack([e1, e2])                     # [3, 2]
         rooms_2d = [(index, img_name, world @ basis, cam @ basis)
                     for index, img_name, world, cam, _ in rooms_2d]
+
+        if args.plan_style == 'heatmap':
+            render_heatmap_plan(rooms_2d, args)
+            sys.exit()
 
         # tab10-like palette
         palette = [
