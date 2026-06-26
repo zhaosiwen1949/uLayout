@@ -672,6 +672,51 @@ class WrapperuLayout:
                             json.dump(pred_json, f, indent=4)
                     i+=1
 
+    def plot_pano_custom(self, save_pred_boundary=False):
+        '''Like plot_pano, but for CustomPanoDataset which provides no label_cor
+        ground truth. Only the predicted boundary is plotted and saved; there is
+        no ground-truth corner/boundary to draw or store.'''
+        self.net.eval()
+        iterator_valid_iou = iter(self.valid_iou_loader)
+        output_dir = os.path.join(self.cfg.output_dir, self.cfg.id_exp)
+        dst_dir_est = output_dir + '/inference_img/' + 'panorama/'
+        if save_pred_boundary:
+            save_boundary_dir_est = output_dir + '/inference_img/' + 'panorama_pred_boundary/'
+            pathlib.Path(save_boundary_dir_est).mkdir(parents=True, exist_ok=True)
+        pathlib.Path(dst_dir_est).mkdir(parents=True, exist_ok=True)
+        i = 0
+
+        for _ in trange(len(iterator_valid_iou), desc="plot image epoch %d" % self.current_epoch):
+            sample = next(iterator_valid_iou)
+            x = sample['img']
+            img_name = sample['img_name']
+
+            with torch.no_grad():
+                y_bon_est, _ = self.net(x.to(self.device))
+                for image, est, name in zip(x, y_bon_est.cpu().numpy(), img_name):
+                    img = image.detach().cpu().numpy().transpose([1, 2, 0])
+                    img = (img.copy()*255).astype(np.uint8)
+                    est_pixel = ((est/np.pi + 0.5)*img.shape[0]).round()
+                    v_x = np.linspace(0, img.shape[1] - 1, img.shape[1]).astype(int)
+
+                    est_pixel_ceiling = np.vstack((v_x, est_pixel[0])).transpose()
+                    plotXY(img, est_pixel_ceiling, color=(0,255,255))
+                    est_pixel_floor = np.vstack((v_x, est_pixel[1])).transpose()
+                    plotXY(img, est_pixel_floor, color=(0,255,255))
+                    imwrite(dst_dir_est+f'est_{i}_{name}.jpg',(img).astype(np.uint8))
+
+                    # save predicted boundary (no ground-truth corner available)
+                    if save_pred_boundary:
+                        pred_json = {
+                            'img_name': name,
+                            'corner': [],
+                            'boundary': est.tolist(),
+                        }
+
+                        with open(save_boundary_dir_est + f'est_{i}.json', 'w') as f:
+                            json.dump(pred_json, f, indent=4)
+                    i+=1
+
     def plot_pp(self):
         self.net.eval()
         iterator_valid_iou = iter(self.valid_iou_loader)

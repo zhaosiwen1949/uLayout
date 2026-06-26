@@ -27,7 +27,7 @@ def main(cfg):
 
     model.prepare_for_validation_multi_dataset()
     model.set_valid_dataloader_custom(cfg.data_dir, mode=cfg.mode)
-    model.plot_pano(cfg.save_pred) # 3D layout only provide for panorama dataset.
+    model.plot_pano_custom(cfg.save_pred) # custom pano dataset has no label_cor ground truth.
 
 
 if __name__ == "__main__":

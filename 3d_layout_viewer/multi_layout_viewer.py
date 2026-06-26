@@ -149,7 +149,7 @@ if __name__ == '__main__':
         print('You may want to export (via --out) or visualize (via --vis)')
         sys.exit()
 
-    # Builds/loads <dataset_dir>/<mode>/camera_poses.json from images.bin
+    # Builds/loads <dataset_dir>/camera_poses.json from images.bin
     dataset = CustomPanoDataset(args.dataset_dir, mode=args.mode)
 
     est_paths = sorted(
