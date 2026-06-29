@@ -331,7 +331,10 @@ if __name__ == '__main__':
         e1 = seed - (seed @ up) * up
         e1 = e1 / np.linalg.norm(e1)
         e2 = np.cross(up, e1)
-        basis = np.column_stack([e1, e2])                     # [3, 2]
+        # Negate e1 so the plan is viewed top-down (from above): with +e1 the
+        # (e1, e2, up) right-handed basis plots the floor as seen from below,
+        # mirroring it left-right. Flipping e1 is a pure horizontal mirror.
+        basis = np.column_stack([-e1, e2])                    # [3, 2]
         rooms_2d = [(index, img_name, world @ basis, cam @ basis)
                     for index, img_name, world, cam, _ in rooms_2d]
 
